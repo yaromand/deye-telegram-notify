@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Deye Battery Monitor</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color-scheme: dark;
+    }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at top, #1e293b, #020617);
+      color: #e5e7eb;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.98);
+      border-radius: 16px;
+      box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
+      padding: 24px 28px;
+      width: 100%;
+      max-width: 720px;
+    }
+    .top-row {
+      display: flex;
+      gap: 24px;
+      flex-wrap: wrap;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: #0b1120;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .pill-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.8);
+    }
+    .soc-value {
+      font-size: 56px;
+      font-weight: 700;
+      margin: 8px 0;
+    }
+    .label {
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .status-ok { color: #4ade80; }
+    .status-low { color: #f97316; }
+    .status-bad { color: #f97316; }
+
+    .bar {
+      width: 100%;
+      height: 14px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: #020617;
+      border: 1px solid #111827;
+      margin-top: 6px;
+    }
+    .bar-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #22c55e, #84cc16, #fde047);
+      transition: width .35s ease;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 22px;
+    }
+    .value {
+      font-size: 16px;
+      font-weight: 500;
+    }
+    .footer {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #6b7280;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+    .chart-wrapper {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid #1f2937;
+    }
+    canvas {
+      max-height: 260px;
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+<div class="card">
+  <div class="top-row">
+    <div style="flex: 1 1 260px;">
+      <div class="pill">
+        <span class="pill-dot"></span>
+        Deye Battery SOC Monitor
+      </div>
+
+      <div class="soc-value">
+        <span id="soc">--</span>%
+      </div>
+      <div id="statusText" class="label status-low">Нет данных</div>
+
+      <div class="bar">
+        <div id="socBar" class="bar-fill"></div>
+      </div>
+
+      <div class="grid">
+        <div>
+          <div class="label">PV генерация</div>
+          <div class="value"><span id="generationPower">--</span> W</div>
+        </div>
+        <div>
+          <div class="label">Мощность батареи</div>
+          <div class="value"><span id="batteryPower">--</span> W</div>
+        </div>
+        <div>
+          <div class="label">Последнее обновление</div>
+          <div class="value" id="lastUpdate">—</div>
+        </div>
+        <div>
+          <div class="label">Порог уведомления</div>
+          <div class="value"><span id="threshold">20</span>%</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="chart-wrapper" style="flex: 1 1 280px;">
+      <div class="label" style="margin-bottom: 6px;">SOC за последние 24 часа</div>
+      <canvas id="socChart"></canvas>
+    </div>
+  </div>
+
+  <div class="footer">
+    <span id="serverTime">—</span>
+    <span id="alertState">Alert: —</span>
+  </div>
+</div>
+
+<script>
+  let socChart = null;
+
+  async function loadStatus() {
+    try {
+      const res = await fetch('/api/status');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+
+      const soc = data.soc ?? data.batterySOC;
+      const socEl = document.getElementById('soc');
+      const socBar = document.getElementById('socBar');
+      const statusText = document.getElementById('statusText');
+
+      if (soc === null || soc === undefined) {
+        socEl.textContent = '--';
+        socBar.style.width = '0%';
+        statusText.textContent = 'SOC недоступен';
+        statusText.className = 'label status-bad';
+      } else {
+        socEl.textContent = soc;
+        const w = Math.max(0, Math.min(100, soc));
+        socBar.style.width = w + '%';
+
+        const thr = data.threshold ?? 20;
+        document.getElementById('threshold').textContent = thr;
+
+        if (soc <= thr) {
+          statusText.textContent = 'Низкий заряд — Telegram уже должен получить алерт';
+          statusText.className = 'label status-low';
+        } else if (soc <= (data.resetThreshold ?? (thr + 5))) {
+          statusText.textContent = 'Заряд близок к порогу';
+          statusText.className = 'label status-low';
+        } else {
+          statusText.textContent = 'Все ок';
+          statusText.className = 'label status-ok';
+        }
+      }
+
+      document.getElementById('generationPower').textContent =
+        data.generationPower != null ? data.generationPower : '--';
+      document.getElementById('batteryPower').textContent =
+        data.batteryPower != null ? data.batteryPower : '--';
+
+      if (data.lastUpdateTime) {
+        const d = new Date(data.lastUpdateTime * 1000);
+        document.getElementById('lastUpdate').textContent = d.toLocaleString();
+      } else {
+        document.getElementById('lastUpdate').textContent = '—';
+      }
+
+      if (data.serverTime) {
+        const d2 = new Date(data.serverTime * 1000);
+        document.getElementById('serverTime').textContent =
+          'Server: ' + d2.toLocaleTimeString();
+      } else {
+        document.getElementById('serverTime').textContent = 'Server: —';
+      }
+
+      const alertState = data.alertState || {};
+      let alertText = 'Alert: —';
+      if (alertState.status === 'low') {
+        alertText = 'Alert: LOW (' + (alertState.last_soc ?? '?') + '%)';
+      } else if (alertState.status === 'ok') {
+        alertText = 'Alert: OK';
+      }
+      document.getElementById('alertState').textContent = alertText;
+
+    } catch (e) {
+      console.error(e);
+      const statusText = document.getElementById('statusText');
+      statusText.textContent = 'Ошибка загрузки данных';
+      statusText.className = 'label status-bad';
+    }
+  }
+
+  async function loadHistory() {
+    try {
+      const res = await fetch('/api/history');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const items = data.items || [];
+
+      if (!items.length) {
+        if (socChart) {
+          socChart.data.labels = [];
+          socChart.data.datasets[0].data = [];
+          socChart.update();
+        }
+        return;
+      }
+
+      const sorted = [...items].reverse();
+
+      const labels = sorted.map(p => {
+        const d = new Date(p.ts * 1000);
+        return d.toLocaleTimeString();
+      });
+
+      const values = sorted.map(p => p.soc);
+
+      const ctx = document.getElementById('socChart').getContext('2d');
+
+      if (!socChart) {
+        socChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'SOC, %',
+              data: values,
+              tension: 0.25,
+              pointRadius: 0,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                ticks: {
+                  maxTicksLimit: 6,
+                }
+              },
+              y: {
+                min: 0,
+                max: 100,
+                ticks: {
+                  stepSize: 20
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(ctx) {
+                    return ctx.parsed.y + ' %';
+                  }
+                }
+              }
+            }
+          }
+        });
+      } else {
+        socChart.data.labels = labels;
+        socChart.data.datasets[0].data = values;
+        socChart.update();
+      }
+
+    } catch (e) {
+      console.error('history error', e);
+    }
+  }
+
+  loadStatus();
+  loadHistory();
+  setInterval(loadStatus, 15000);
+  setInterval(loadHistory, 60000);
+</script>
+</body>
+</html>
