@@ -2,7 +2,7 @@
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
-  <title>Deye Battery Monitor</title>
+  <title>Deye Monitor</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <style>
     :root {
@@ -23,7 +23,7 @@
       border-radius: 16px;
       box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
       padding: 24px 28px;
-      width: 100%;
+      width: 80%;
       max-width: 720px;
     }
     .top-row {
@@ -113,13 +113,13 @@
     <div style="flex: 1 1 260px;">
       <div class="pill">
         <span class="pill-dot"></span>
-        Deye Battery SOC Monitor
+        Deye Monitor
       </div>
 
       <div class="soc-value">
         <span id="soc">--</span>%
       </div>
-      <div id="statusText" class="label status-low">Нет данных</div>
+      <div id="statusText" class="label status-low">Немає даних</div>
 
       <div class="bar">
         <div id="socBar" class="bar-fill"></div>
@@ -127,26 +127,26 @@
 
       <div class="grid">
         <div>
-          <div class="label">PV генерация</div>
+          <div class="label">PV генерація</div>
           <div class="value"><span id="generationPower">--</span> W</div>
         </div>
         <div>
-          <div class="label">Мощность батареи</div>
+          <div class="label">Потужність батареї</div>
           <div class="value"><span id="batteryPower">--</span> W</div>
         </div>
         <div>
-          <div class="label">Последнее обновление</div>
+          <div class="label">Останнє оновлення</div>
           <div class="value" id="lastUpdate">—</div>
         </div>
-        <div>
-          <div class="label">Порог уведомления</div>
+        <div style="display: none;">
+          <div class="label">Поріг повідомлення</div>
           <div class="value"><span id="threshold">20</span>%</div>
         </div>
       </div>
     </div>
 
     <div class="chart-wrapper" style="flex: 1 1 280px;">
-      <div class="label" style="margin-bottom: 6px;">SOC за последние 24 часа</div>
+      <div class="label" style="margin-bottom: 6px;">SOC за останні 24 години</div>
       <canvas id="socChart"></canvas>
     </div>
   </div>
@@ -174,7 +174,7 @@
       if (soc === null || soc === undefined) {
         socEl.textContent = '--';
         socBar.style.width = '0%';
-        statusText.textContent = 'SOC недоступен';
+        statusText.textContent = 'SOC недоступний';
         statusText.className = 'label status-bad';
       } else {
         socEl.textContent = soc;
@@ -185,13 +185,13 @@
         document.getElementById('threshold').textContent = thr;
 
         if (soc <= thr) {
-          statusText.textContent = 'Низкий заряд — Telegram уже должен получить алерт';
+          statusText.textContent = 'Низький заряд';
           statusText.className = 'label status-low';
         } else if (soc <= (data.resetThreshold ?? (thr + 5))) {
-          statusText.textContent = 'Заряд близок к порогу';
+          statusText.textContent = 'Заряд близький до порога';
           statusText.className = 'label status-low';
         } else {
-          statusText.textContent = 'Все ок';
+          statusText.textContent = 'Все окей';
           statusText.className = 'label status-ok';
         }
       }
@@ -228,7 +228,7 @@
     } catch (e) {
       console.error(e);
       const statusText = document.getElementById('statusText');
-      statusText.textContent = 'Ошибка загрузки данных';
+      statusText.textContent = 'Помилка завантаження даних';
       statusText.className = 'label status-bad';
     }
   }

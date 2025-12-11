@@ -165,7 +165,7 @@ class MonitorService:
                     logging.warning("Немає station_id, пропускаємо ітерацію")
                 else:
                     payload = self._client.get_station_latest(station_id)
-
+                    print(payload)
                     # Тут припускаємо, що Deye віддає batterySOC / generationPower / batteryPower
                     # або на верхньому рівні, або в data["data"] — див. клієнт.
                     soc = payload.get("batterySOC")
@@ -211,9 +211,9 @@ class MonitorService:
                 "⚠️ <b>Рівень заряду акумулятора майже досяг критичного порога</b>\n"
                 "Можливі відключення електроенергії найближчим часом.\n"
                 "Будь ласка, утримайтеся від користування ліфтом, щоб не застрягнути.\n\n"
-                f"SOC: <b>{soc}%</b>\n"
-                f"PV: {generation_power if generation_power is not None else '—'} W\n"
-                f"Battery: {battery_power if battery_power is not None else '—'} W\n"
+                f"Заряд акумулятора: <b>{soc}%</b>\n"
+           #     f"PV: {generation_power if generation_power is not None else '—'} W\n"
+           #     f"Battery: {battery_power if battery_power is not None else '—'} W\n"
             )
             if self._notifier.send_message(text):
                 logging.info(
